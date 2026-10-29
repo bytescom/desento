@@ -13,14 +13,16 @@ export async function GET(req) {
         }
 
         const user = await User.findOne({ email: session.user.email })
-            .select('name email image settings documents resumes coverLetters')
+            .select('name email image settings documents resumes coverLetters refreshToken')
             .lean();
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        return NextResponse.json({ data: user });
+        // Expose connection state only — never the token itself
+        const { refreshToken, ...safeUser } = user;
+        return NextResponse.json({ data: { ...safeUser, gmailConnected: !!refreshToken } });
     } catch (error) {
         console.error('Error fetching user profile:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -36,10 +38,17 @@ export async function PATCH(req) {
         }
 
         const body = await req.json();
-        const { name, settings } = body;
+        const { name, settings, headline, portfolioLink, experienceSummary, skills } = body;
 
         const updateFields = {};
         if (name !== undefined) updateFields.name = name;
+        // Profile enrichment fields (defined in the User settings schema) — accepted
+        // nested under `settings` (ProfileTab's payload) or at the top level.
+        const profileSrc = settings || {};
+        if (profileSrc.headline !== undefined || headline !== undefined) updateFields['settings.headline'] = profileSrc.headline ?? headline;
+        if (profileSrc.portfolioLink !== undefined || portfolioLink !== undefined) updateFields['settings.portfolioLink'] = profileSrc.portfolioLink ?? portfolioLink;
+        if (profileSrc.experienceSummary !== undefined || experienceSummary !== undefined) updateFields['settings.experienceSummary'] = profileSrc.experienceSummary ?? experienceSummary;
+        if (profileSrc.skills !== undefined || skills !== undefined) updateFields['settings.skills'] = profileSrc.skills ?? skills;
         if (settings !== undefined) {
             // Merge settings fields individually, don't overwrite entire settings object
             if (settings.emailDelay !== undefined) updateFields['settings.emailDelay'] = settings.emailDelay;

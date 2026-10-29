@@ -6,7 +6,7 @@ import DesentoHeroIllustration from '@/components/DesentoHeroIllustration'
 
 const Hero = () => {
     return (
-        <section className="relative w-full overflow-hidden bg-background min-h-[92vh] flex items-center pt-10 pb-16 lg:pt-16 lg:pb-24">
+        <section className="relative w-full overflow-hidden bg-background min-h-[82vh] flex items-center pt-6 pb-14 lg:pt-8 lg:pb-16">
             {/* Layered Background */}
             <div className="absolute inset-0 pointer-events-none z-0">
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,#000_20%,transparent_100%)] opacity-50"></div>
@@ -42,7 +42,9 @@ const Hero = () => {
 
                 {/* Right Column (Interactive Dashboard UI) */}
                 <div className="relative w-full flex items-center justify-center lg:justify-end z-10">
-                    <DesentoHeroIllustration />
+                    <div className="w-full max-w-[540px] [zoom:0.95] lg:[zoom:0.8] lg:mr-16">
+                        <DesentoHeroIllustration />
+                    </div>
                 </div>
 
             </div>

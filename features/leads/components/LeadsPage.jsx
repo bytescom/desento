@@ -389,7 +389,108 @@ const AddContactForm = ({ onClose, onSave, editingLead }) => {
 };
 
 // ── Bulk CSV Import ────────────────────────────────────────────────────────
-const BulkImportModal = ({ onClose }) => {
+// ── Bulk Import (real CSV parse + bulk POST) ────────────────────────────────
+const BulkImportModal = ({ onClose, onImported }) => {
+    const [fileName, setFileName] = useState("");
+    const [rows, setRows] = useState(null);
+    const [error, setError] = useState("");
+    const [importing, setImporting] = useState(false);
+    const [result, setResult] = useState(null);
+
+    // Minimal CSV parser: quoted fields, commas/newlines inside quotes, CRLF
+    const parseCSV = (raw) => {
+        const rows = [];
+        let row = [], field = "", inQuotes = false;
+        for (let i = 0; i < raw.length; i++) {
+            const ch = raw[i];
+            if (inQuotes) {
+                if (ch === '"' && raw[i + 1] === '"') { field += '"'; i++; }
+                else if (ch === '"') { inQuotes = false; }
+                else { field += ch; }
+            } else if (ch === '"') {
+                inQuotes = true;
+            } else if (ch === ",") {
+                row.push(field); field = "";
+            } else if (ch === "\n" || ch === "\r") {
+                if (ch === "\r" && raw[i + 1] === "\n") i++;
+                row.push(field); field = "";
+                if (row.some(c => c.trim() !== "")) rows.push(row);
+                row = [];
+            } else {
+                field += ch;
+            }
+        }
+        row.push(field);
+        if (row.some(c => c.trim() !== "")) rows.push(row);
+        return rows;
+    };
+
+    const handleFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setError("");
+        setResult(null);
+        setFileName(file.name);
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const allRows = parseCSV(String(reader.result));
+                if (allRows.length < 2) {
+                    setError("The file needs a header row and at least one data row.");
+                    setRows(null);
+                    return;
+                }
+                const headers = allRows[0].map(h => h.trim().toLowerCase().replace(/\s+/g, "_"));
+                const idx = (names) => headers.findIndex(h => names.includes(h));
+                const iEmail = idx(["email", "e_mail", "email_address"]);
+                const iCompany = idx(["company", "company_name"]);
+                const iRole = idx(["role", "job_role", "jobrole", "position"]);
+                if (iEmail === -1 || iCompany === -1 || iRole === -1) {
+                    setError("Missing required columns. The header row must include email, company, and role.");
+                    setRows(null);
+                    return;
+                }
+                const parsed = allRows.slice(1).map(r => ({
+                    email: (r[iEmail] || "").trim(),
+                    company: (r[iCompany] || "").trim(),
+                    jobRole: (r[iRole] || "").trim(),
+                    hrName: iEmail > -1 && headers.includes("hr_name") ? (r[headers.indexOf("hr_name")] || "").trim() : (r[idx(["hr_name", "contact_name", "name"])] || "").trim(),
+                    notes: headers.includes("notes") ? (r[headers.indexOf("notes")] || "").trim() : "",
+                    tags: headers.includes("tags") ? (r[headers.indexOf("tags")] || "").split(/[|;]/).map(t => t.trim()).filter(Boolean) : [],
+                }));
+                setRows(parsed);
+            } catch {
+                setError("Could not read the file. Make sure it's a valid CSV.");
+                setRows(null);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleImport = async () => {
+        if (!rows?.length) return;
+        setImporting(true);
+        setError("");
+        try {
+            const res = await fetch("/api/leads/bulk", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ leads: rows }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error || "Import failed.");
+            } else {
+                setResult(data);
+                onImported?.();
+            }
+        } catch {
+            setError("Network error during import.");
+        } finally {
+            setImporting(false);
+        }
+    };
+
     return (
         <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center">
             <div className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity" onClick={onClose} />
@@ -399,23 +500,57 @@ const BulkImportModal = ({ onClose }) => {
                     <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface text-muted hover:text-text-dark transition-colors cursor-pointer"><FiX size={18} /></button>
                 </div>
 
-                <div className="mb-5 p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl text-[12px] text-blue-800 font-medium">
-                    <p className="font-bold text-blue-900 mb-1">CSV Format Requirements:</p>
-                    <p>Include columns: <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">email</code>, <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">company</code>, <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">role</code></p>
-                </div>
+                {error && (
+                    <div className="mb-5 px-4 py-3 bg-red-50 border border-red-100 rounded-lg text-[13px] font-medium text-red-600">{error}</div>
+                )}
 
-                <label className="block mb-5 cursor-pointer border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-all group">
-                    <div className="w-12 h-12 rounded-full bg-surface group-hover:bg-white flex items-center justify-center mx-auto mb-3 shadow-sm transition-colors">
-                        <FiUpload size={20} className="text-muted group-hover:text-primary transition-colors" />
+                {result ? (
+                    <div className="mb-5">
+                        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-[13px] text-emerald-800 font-medium space-y-1">
+                            <p className="font-bold text-emerald-900">Import finished</p>
+                            <p>Imported: <strong>{result.imported}</strong></p>
+                            <p>Duplicates skipped: <strong>{result.duplicates}</strong></p>
+                            <p>Invalid rows: <strong>{result.invalid?.length || 0}</strong> of {result.total}</p>
+                            {result.invalid?.length > 0 && (
+                                <ul className="mt-2 text-[12px] list-disc list-inside max-h-32 overflow-y-auto">
+                                    {result.invalid.slice(0, 10).map((r, i) => (
+                                        <li key={i}>{r.email} — {r.reason}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <button onClick={onClose} className="mt-4 w-full py-2.5 bg-primary text-white rounded-lg font-semibold text-[13.5px] hover:bg-primary/90 transition-colors cursor-pointer">
+                            Done
+                        </button>
                     </div>
-                    <p className="text-[14px] font-bold text-text-dark group-hover:text-primary transition-colors mb-1">Click to upload CSV</p>
-                    <p className="text-[12px] text-muted font-medium">or drag and drop file here</p>
-                    <input type="file" accept=".csv,text/csv" className="hidden" onChange={onClose} />
-                </label>
+                ) : (
+                    <>
+                        <div className="mb-5 p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl text-[12px] text-blue-800 font-medium">
+                            <p className="font-bold text-blue-900 mb-1">CSV Format Requirements:</p>
+                            <p>Include columns: <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">email</code>, <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">company</code>, <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">role</code> — optional: <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">hr_name</code>, <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">notes</code>, <code className="bg-white/50 px-1 py-0.5 rounded text-blue-700">tags</code></p>
+                        </div>
 
-                <button onClick={onClose} className="w-full py-2.5 bg-background border border-border text-text-dark rounded-lg font-semibold text-[13.5px] flex items-center justify-center hover:bg-surface transition-colors cursor-pointer shadow-sm">
-                    Cancel
-                </button>
+                        <label className="block mb-5 cursor-pointer border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-all group">
+                            <div className="w-12 h-12 rounded-full bg-surface group-hover:bg-white flex items-center justify-center mx-auto mb-3 shadow-sm transition-colors">
+                                <FiUpload size={20} className="text-muted group-hover:text-primary transition-colors" />
+                            </div>
+                            <p className="text-[14px] font-bold text-text-dark group-hover:text-primary transition-colors mb-1">{fileName || "Click to upload CSV"}</p>
+                            <p className="text-[12px] text-muted font-medium">{rows ? `${rows.length} contacts ready to import` : "or drag and drop file here"}</p>
+                            <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
+                        </label>
+
+                        <button
+                            onClick={handleImport}
+                            disabled={!rows || importing}
+                            className="w-full py-2.5 bg-primary text-white rounded-lg font-semibold text-[13.5px] flex items-center justify-center hover:bg-primary/90 transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed mb-2"
+                        >
+                            {importing ? "Importing…" : rows ? `Import ${rows.length} contacts` : "Import"}
+                        </button>
+                        <button onClick={onClose} className="w-full py-2.5 bg-background border border-border text-text-dark rounded-lg font-semibold text-[13.5px] flex items-center justify-center hover:bg-surface transition-colors cursor-pointer shadow-sm">
+                            Cancel
+                        </button>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -456,32 +591,22 @@ const Leads = () => {
     }, [searchParams]);
 
     // Fetch leads from DB
-    useEffect(() => {
-        const controller = new AbortController();
-
-        async function fetchLeads() {
-            try {
-                const res = await fetch("/api/leads", {
-                    signal: controller.signal,
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    setLeads(data.contacts || []);
-                }
-            } catch (error) {
-                if (error.name !== "AbortError") {
-                    console.error("Failed to fetch leads:", error);
-                }
-            } finally {
-                setLoading(false);
+    const loadLeads = async () => {
+        try {
+            const res = await fetch("/api/leads");
+            const data = await res.json();
+            if (res.ok) {
+                setLeads(data.contacts || []);
             }
+        } catch (error) {
+            console.error("Failed to fetch leads:", error);
+        } finally {
+            setLoading(false);
         }
+    };
 
-        fetchLeads();
-
-        return () => {
-            controller.abort();
-        };
+    useEffect(() => {
+        loadLeads();
     }, []);
 
     // Close dropdown on outside click
@@ -541,12 +666,12 @@ const Leads = () => {
             (l.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
             (l.jobRole || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-        // Status Filter (Naive implementation based on tags, modify as per actual data model)
+        // Status Filter — uses the real HrEmail.status field (active/contacted/responded/archived)
         let matchesStatus = true;
         if (statusFilter === 'New') {
-            matchesStatus = !l.tags || l.tags.length === 0 || l.tags.some(t => t.toLowerCase().includes('new'));
+            matchesStatus = !l.status || l.status === 'active';
         } else if (statusFilter === 'Contacted') {
-            matchesStatus = l.tags && l.tags.some(t => t.toLowerCase().includes('contacted') || t.toLowerCase().includes('follow up') || t.toLowerCase().includes('applied'));
+            matchesStatus = l.status === 'contacted' || l.status === 'responded';
         }
 
         // Date Filter (Placeholder: Assuming 'createdAt' exists. If not, this is a no-op for now)
@@ -573,7 +698,8 @@ const Leads = () => {
     const totalContacts = leads.length;
     const totalCompanies = new Set(leads.filter(l => l.company).map(l => l.company)).size;
     const followUps = leads.filter(l => l.tags?.some(t => t.toLowerCase().includes('follow up') || t.toLowerCase().includes('pending'))).length || 0;
-    const pendingOutreach = Math.max(0, totalContacts - followUps - Math.floor(totalContacts * 0.2));
+    // Real count: leads not yet contacted (status 'active'); fall back to 'active' when status is missing
+    const pendingOutreach = leads.filter(l => (l.status || 'active') === 'active').length;
 
     const stats = [
         { label: "Total Contacts", value: totalContacts },
@@ -585,7 +711,7 @@ const Leads = () => {
     return (
         <div className="relative flex flex-col min-h-full h-full w-full max-w-full overflow-x-hidden px-1 sm:px-2 pb-2">
 
-            {showBulk && <BulkImportModal onClose={() => setShowBulk(false)} />}
+            {showBulk && <BulkImportModal onClose={() => setShowBulk(false)} onImported={loadLeads} />}
 
             {viewingLead && (
                 <ContactDetailsPanel
@@ -670,7 +796,7 @@ const Leads = () => {
                             placeholder="Search contacts..."
                             className="w-full pl-9 pr-14 py-2 bg-background border border-border/60 rounded-lg text-[13px] font-medium placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                         />
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pointer-events-none">
+                        <div className="hidden sm:flex absolute right-2.5 top-1/2 -translate-y-1/2 items-center gap-0.5 pointer-events-none">
                             <kbd className="px-1.5 py-0.5 text-[10px] font-bold bg-surface border border-border rounded text-muted">Ctrl</kbd>
                             <kbd className="px-1.5 py-0.5 text-[10px] font-bold bg-surface border border-border rounded text-muted">K</kbd>
                         </div>
@@ -803,6 +929,7 @@ const Leads = () => {
                                                         onClick={(e) => { e.stopPropagation(); handleEdit(lead); }}
                                                         className="p-1.5 text-muted hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/20 rounded-md transition-all cursor-pointer"
                                                         title="Edit"
+                                                        aria-label={`Edit ${lead.email}`}
                                                     >
                                                         <FiEdit2 size={14} />
                                                     </button>
@@ -810,6 +937,7 @@ const Leads = () => {
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(lead._id); }}
                                                         className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-md transition-all cursor-pointer"
                                                         title="Delete"
+                                                        aria-label={`Delete ${lead.email}`}
                                                     >
                                                         <FiTrash2 size={14} />
                                                     </button>
@@ -817,6 +945,7 @@ const Leads = () => {
                                                         onClick={(e) => { e.stopPropagation(); }}
                                                         className="p-1.5 text-muted hover:text-text-dark hover:bg-surface border border-transparent hover:border-border rounded-md transition-all cursor-pointer"
                                                         title="More Options"
+                                                        aria-label={`More options for ${lead.email}`}
                                                     >
                                                         <FiMoreHorizontal size={14} />
                                                     </button>

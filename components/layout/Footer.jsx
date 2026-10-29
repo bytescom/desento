@@ -12,16 +12,16 @@ export default function Footer() {
         {
             title: "Legal",
             links: [
-                { name: "Privacy Policy", href: "legal/privacy" },
-                { name: "Terms of Service", href: "legal/terms" },
+                { name: "Privacy Policy", href: "/privacy" },
+                { name: "Terms of Service", href: "/terms" },
             ],
         },
         {
             title: "Product",
             links: [
                 { name: "Features", href: "/#features" },
-                { name: "Pricing", href: "/#pricing" },
-                { name: "Waitlist", href: "/#footer" },
+                { name: "Pricing", href: "/#cta" },
+                { name: "Waitlist", href: "/signup" },
             ],
         },
     ];
@@ -40,7 +40,7 @@ export default function Footer() {
             </div>
 
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                <div className="grid gap-25 lg:grid-cols-12 mb-12">
+                <div className="grid gap-8 lg:grid-cols-12 mb-12">
                     {/* Brand Section */}
                     <div className="lg:col-span-4 space-y-6">
                         <Link href="/" className="flex items-center gap-2" aria-label="Desento">

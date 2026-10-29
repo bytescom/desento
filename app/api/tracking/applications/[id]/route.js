@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import Application from '../../../../../models/Application';
 import ActivityLog from '../../../../../models/ActivityLog';
+import EmailLog from '../../../../../models/EmailLog';
+import Campaign from '../../../../../models/Campaign';
+import EmailTemplate from '../../../../../models/EmailTemplate';
 import User from '../../../../../models/User';
 import { connectDB } from '@/lib/db';
 import mongoose from 'mongoose';
@@ -33,6 +36,16 @@ export async function GET(req, { params }) {
         const activityLogs = await ActivityLog.find({ applicationId: id })
             .sort({ createdAt: -1 })
             .lean();
+
+        // Resolve the actual sent email → campaign/template for real metadata
+        let emailLog = null;
+        if (application.emailLogId) {
+            const EmailLogModel = mongoose.models.EmailLog || EmailLog;
+            emailLog = await EmailLogModel.findById(application.emailLogId)
+                .populate('campaignId', 'name status')
+                .populate('templateId', 'name')
+                .lean();
+        }
 
         // Format timeline specifically for the vertical timeline component
         const timeline = activityLogs.map(log => ({
@@ -66,14 +79,22 @@ export async function GET(req, { params }) {
             status: statusMap[application.status] || 'Sent',
             dateCreated: new Date(application.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
             lastUpdated: new Date(application.lastActionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-            campaignName: 'Q3 Outbound Strategy', // Mocked as it might require another lookup
-            campaignStatus: 'Active',
+            campaignName: emailLog?.campaignId?.name || null,
+            campaignStatus: emailLog?.campaignId?.status || null,
             gmailAccount: session.user.email,
-            templateUsed: 'Outreach V2', // Mocked
+            templateUsed: emailLog?.templateId?.name || null,
+            email: emailLog ? {
+                subject: emailLog.subject,
+                body: emailLog.body,
+                sentAt: emailLog.sentAt ? new Date(emailLog.sentAt).toLocaleString('en-GB', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                }) : null,
+            } : null,
             followUp: {
                 enabled: true,
-                total: 4,
-                completed: application.followUpCount,
+                total: null, // no planned-total concept exists yet; UI shows completed count only
+                completed: application.followUpCount || 0,
                 nextDate: application.followUpDate ? new Date(application.followUpDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
             },
             reply: {

@@ -5,6 +5,21 @@ import Campaign from "@/models/Campaign";
 import User from "@/models/User";
 import mongoose from "mongoose";
 
+const CAMPAIGN_STATUSES = ["Draft", "Running", "Scheduled", "Completed", "Failed"];
+
+// Keep only safe, size-capped attachment fields (base64 data is capped to
+// ~4.5 MB per file so a single request can't blow past Mongo's 16 MB doc limit)
+function sanitizeAttachments(attachments) {
+    return (Array.isArray(attachments) ? attachments : [])
+        .map(a => ({
+            name: String(a?.name || "").replace(/[\r\n"\\]/g, "").slice(0, 200),
+            size: String(a?.size || "").slice(0, 20),
+            contentType: String(a?.contentType || "application/octet-stream").slice(0, 100),
+            ...(typeof a?.data === "string" && a.data.length <= 6_000_000 ? { data: a.data } : {}),
+        }))
+        .filter(a => a.name);
+}
+
 // GET — fetch all campaigns for logged-in user
 export async function GET() {
     try {
@@ -45,6 +60,7 @@ export async function POST(request) {
 
         const validTemplateId = mongoose.Types.ObjectId.isValid(templateId) ? templateId : null;
         const validAudienceIds = (audienceIds || []).filter(id => mongoose.Types.ObjectId.isValid(id));
+        const validStatus = CAMPAIGN_STATUSES.includes(status) ? status : "Draft";
 
         const campaign = await Campaign.create({
             userId: user._id,
@@ -53,12 +69,12 @@ export async function POST(request) {
             templateId: validTemplateId,
             templateSnapshot: templateSnapshot || {},
             audienceIds: validAudienceIds,
-            attachments: attachments || [],
+            attachments: sanitizeAttachments(attachments),
             totalRecipients: validAudienceIds.length,
             trackOpens: trackOpens ?? true,
             trackReplies: trackReplies ?? true,
             stopAfterReply: stopAfterReply ?? true,
-            status: status || 'Draft',
+            status: validStatus,
         });
 
         return NextResponse.json({ campaign }, { status: 201 });

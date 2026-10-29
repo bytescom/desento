@@ -1,12 +1,48 @@
 "use client"
-import React from 'react'
-import { useSession, signIn, signOut } from 'next-auth/react'
-import { FiCheckCircle, FiAlertTriangle, FiX, FiZap } from 'react-icons/fi'
+import React, { useEffect, useState } from 'react'
+import { useSession, signIn } from 'next-auth/react'
+import { FiCheckCircle, FiAlertTriangle, FiX, FiZap, FiLoader } from 'react-icons/fi'
 
 const IntegrationsTab = () => {
     const { data: session, status } = useSession();
-    const isConnected = status === 'authenticated' && !!session?.user?.email;
+    const [gmailConnected, setGmailConnected] = useState(null); // null = loading
+    const [disconnecting, setDisconnecting] = useState(false);
+    const [disconnectError, setDisconnectError] = useState('');
+
+    useEffect(() => {
+        async function loadConnection() {
+            try {
+                const res = await fetch('/api/user/profile');
+                const { data } = await res.json();
+                setGmailConnected(!!data?.gmailConnected);
+            } catch {
+                setGmailConnected(!!session?.user?.email);
+            }
+        }
+        if (status === 'authenticated') loadConnection();
+    }, [status, session]);
+
     const gmailEmail = session?.user?.email;
+    const isConnected = status === 'authenticated' && gmailConnected === true;
+
+    const handleDisconnect = async () => {
+        if (!window.confirm('Disconnect Gmail? You will stay signed in to Desento, but campaigns cannot send emails until you reconnect.')) return;
+        setDisconnecting(true);
+        setDisconnectError('');
+        try {
+            const res = await fetch('/api/user/disconnect-gmail', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setDisconnectError(data.error || 'Failed to disconnect Gmail.');
+            } else {
+                setGmailConnected(false);
+            }
+        } catch {
+            setDisconnectError('Network error. Please try again.');
+        } finally {
+            setDisconnecting(false);
+        }
+    };
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-full">
@@ -39,12 +75,23 @@ const IntegrationsTab = () => {
                             </div>
                         </div>
 
-                        {isConnected ? (
+                        {status !== 'authenticated' ? (
                             <button
-                                onClick={() => signOut({ callbackUrl: '/login' })}
-                                className="flex items-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-500 rounded-lg text-[13px] font-bold hover:bg-red-100 transition-colors cursor-pointer"
+                                onClick={() => signIn('google')}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-[13px] font-bold hover:opacity-90 transition-colors cursor-pointer"
                             >
-                                <FiX size={13} /> Disconnect
+                                Connect Gmail
+                            </button>
+                        ) : gmailConnected === null ? (
+                            <span className="px-4 py-2 text-[13px] font-bold text-muted">Checking…</span>
+                        ) : isConnected ? (
+                            <button
+                                onClick={handleDisconnect}
+                                disabled={disconnecting}
+                                className="flex items-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-500 rounded-lg text-[13px] font-bold hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {disconnecting ? <FiLoader size={13} className="animate-spin" /> : <FiX size={13} />}
+                                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
                             </button>
                         ) : (
                             <button
@@ -55,6 +102,12 @@ const IntegrationsTab = () => {
                             </button>
                         )}
                     </div>
+
+                    {disconnectError && (
+                        <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-lg text-[13px] font-medium text-red-600">
+                            {disconnectError}
+                        </div>
+                    )}
 
                     {/* Status banner */}
                     {!isConnected ? (

@@ -11,6 +11,11 @@ const EmailLogSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'EmailTemplate',
     },
+    campaignId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Campaign',
+        index: true,
+    },
     hrEmailId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'HrEmail',

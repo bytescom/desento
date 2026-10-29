@@ -38,10 +38,20 @@ const CampaignSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'HrEmail',
     }],
-    // Simple name/size list for attachments (future: store paths)
+    // Leads already attempted by the batched send loop — lets /send resume
+    // where it stopped instead of restarting (or worse, re-sending) after a
+    // timeout or a follow-up batch request.
+    sentLeadIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'HrEmail',
+    }],
+    // Campaign attachments — small files stored base64-inline (cap ~4 MB total
+    // enforced by the API) and attached to every email in the campaign.
     attachments: [{
         name: String,
         size: String,
+        contentType: String,
+        data: String, // base64 (no data: prefix)
     }],
     // Progress tracking
     totalRecipients: {

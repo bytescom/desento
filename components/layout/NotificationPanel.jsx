@@ -9,40 +9,14 @@ const emptySubscribe = () => () => {};
 const getSnapshot = () => true;
 const getServerSnapshot = () => false;
 
-const INITIAL_NOTIFICATIONS = [
-    {
-        id: 1,
-        type: "success",
-        title: "Email campaign sent",
-        message: "Your outreach to 42 leads was delivered successfully.",
-        time: "2m ago",
-        read: false,
-    },
-    {
-        id: 2,
-        type: "info",
-        title: "Follow-up reminder",
-        message: "3 leads haven't responded in over 7 days.",
-        time: "1h ago",
-        read: false,
-    },
-    {
-        id: 3,
-        type: "alert",
-        title: "Bounce detected",
-        message: "1 email bounced in your last campaign.",
-        time: "3h ago",
-        read: true,
-    },
-    {
-        id: 4,
-        type: "mail",
-        title: "New reply received",
-        message: "Sarah from Acme Corp replied to your outreach.",
-        time: "Yesterday",
-        read: true,
-    },
-];
+// Map backend Notification.type -> UI style buckets
+const typeStyleMap = {
+    campaign: { icon: "success", bg: "bg-emerald-50 border-emerald-100" },
+    hr_sync: { icon: "mail", bg: "bg-violet-50 border-violet-100" },
+    security: { icon: "alert", bg: "bg-amber-50 border-amber-100" },
+    system: { icon: "alert", bg: "bg-amber-50 border-amber-100" },
+    info: { icon: "info", bg: "bg-sky-50 border-sky-100" },
+};
 
 const iconMap = {
     success: <FiCheckCircle className="text-emerald-500" size={16} />,
@@ -51,22 +25,53 @@ const iconMap = {
     mail: <FiMail className="text-violet-500" size={16} />,
 };
 
-const bgMap = {
-    success: "bg-emerald-50 border-emerald-100",
-    info: "bg-sky-50 border-sky-100",
-    alert: "bg-amber-50 border-amber-100",
-    mail: "bg-violet-50 border-violet-100",
-};
+function timeAgo(iso) {
+    if (!iso) return "";
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
 
 export default function NotificationPanel() {
     const [open, setOpen] = useState(false);
-    const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+    const [notifications, setNotifications] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [panelStyle, setPanelStyle] = useState({});
     const mounted = useSyncExternalStore(emptySubscribe, getSnapshot, getServerSnapshot);
     const bellRef = useRef(null);
     const panelRef = useRef(null);
 
-    const unreadCount = notifications.filter((n) => !n.read).length;
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+    const loadNotifications = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/notifications");
+            if (res.ok) {
+                const data = await res.json();
+                setNotifications(data.notifications || []);
+            }
+        } catch {
+            // keep current list on failure
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Load on mount (so the unread badge is accurate) and on every open
+    useEffect(() => {
+        if (mounted) loadNotifications();
+    }, [mounted]);
+
+    useEffect(() => {
+        if (open) loadNotifications();
+    }, [open]);
 
     // Recalculate panel position whenever open state changes
     useEffect(() => {
@@ -115,19 +120,28 @@ export default function NotificationPanel() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open]);
 
-    const markAllRead = () => {
-        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const markAllRead = async () => {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        await fetch("/api/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => {});
         toast.success("All notifications marked as read");
     };
 
-    const dismiss = (id) => {
+    const dismiss = async (id) => {
         setNotifications((prev) => prev.filter((n) => n.id !== id));
+        await fetch("/api/notifications", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
     };
 
-    const markRead = (id) => {
+    const markRead = async (id) => {
         setNotifications((prev) =>
-            prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+            prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
         );
+        await fetch("/api/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
+    };
+
+    const clearAll = async () => {
+        setNotifications([]);
+        await fetch("/api/notifications", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => {});
+        toast.success("All notifications cleared");
     };
 
     const dropdown = (
@@ -174,7 +188,14 @@ export default function NotificationPanel() {
 
                 {/* List */}
                 <div className="overflow-y-auto flex-1 no-scrollbar">
-                    {notifications.length === 0 ? (
+                    {loading && notifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center px-6">
+                            <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center animate-pulse">
+                                <FiBell size={22} className="text-muted" />
+                            </div>
+                            <p className="text-[12px] text-muted">Loading notifications…</p>
+                        </div>
+                    ) : notifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-3 text-center px-6">
                             <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center">
                                 <FiBell size={22} className="text-muted" />
@@ -184,31 +205,33 @@ export default function NotificationPanel() {
                         </div>
                     ) : (
                         <ul className="divide-y divide-border/50">
-                            {notifications.map((n) => (
+                            {notifications.map((n) => {
+                                const style = typeStyleMap[n.type] || typeStyleMap.info;
+                                return (
                                 <li
                                     key={n.id}
-                                    onClick={() => markRead(n.id)}
+                                    onClick={() => !n.isRead && markRead(n.id)}
                                     className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer group transition-colors ${
-                                        n.read ? "hover:bg-surface/50" : "bg-primary/[0.03] hover:bg-primary/[0.06]"
+                                        n.isRead ? "hover:bg-surface/50" : "bg-primary/[0.03] hover:bg-primary/[0.06]"
                                     }`}
                                 >
                                     {/* Icon badge */}
-                                    <div className={`mt-0.5 shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center ${bgMap[n.type]}`}>
-                                        {iconMap[n.type]}
+                                    <div className={`mt-0.5 shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center ${style.bg}`}>
+                                        {iconMap[style.icon]}
                                     </div>
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-[13px] leading-snug ${n.read ? "font-medium text-text" : "font-bold text-text-dark"}`}>
+                                        <p className={`text-[13px] leading-snug ${n.isRead ? "font-medium text-text" : "font-bold text-text-dark"}`}>
                                             {n.title}
                                         </p>
                                         <p className="text-[12px] text-muted mt-0.5 leading-relaxed">{n.message}</p>
-                                        <p className="text-[11px] text-muted/60 mt-1 font-medium">{n.time}</p>
+                                        <p className="text-[11px] text-muted/60 mt-1 font-medium">{timeAgo(n.createdAt)}</p>
                                     </div>
 
                                     {/* Unread dot + dismiss */}
                                     <div className="flex flex-col items-center gap-2 shrink-0">
-                                        {!n.read && (
+                                        {!n.isRead && (
                                             <span className="w-2 h-2 rounded-full bg-primary mt-1" />
                                         )}
                                         <button
@@ -220,7 +243,8 @@ export default function NotificationPanel() {
                                         </button>
                                     </div>
                                 </li>
-                            ))}
+                                );
+                            })}
                         </ul>
                     )}
                 </div>
@@ -229,10 +253,7 @@ export default function NotificationPanel() {
                 {notifications.length > 0 && (
                     <div className="px-4 py-3 border-t border-border bg-surface/40">
                         <button
-                            onClick={() => {
-                                setNotifications([]);
-                                toast.success("All notifications cleared");
-                            }}
+                            onClick={clearAll}
                             className="w-full text-[12px] font-semibold text-muted hover:text-red-500 transition-colors cursor-pointer"
                         >
                             Clear all notifications

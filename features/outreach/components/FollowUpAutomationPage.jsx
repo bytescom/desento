@@ -265,6 +265,12 @@ export default function FollowUpAutomationPage() {
                 </div>
             </div>
 
+            {/* Prototype notice — this page is not wired to the backend yet */}
+            <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] font-medium text-amber-800 flex items-center gap-2.5 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                Prototype preview — follow-up sequences, lead counts, and launching are not connected to the backend yet. Nothing you configure here sends emails.
+            </div>
+
             {/* Main Grid */}
             <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0 pb-10">
                 {/* Left Column */}

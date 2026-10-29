@@ -84,6 +84,8 @@ const ApplicationSchema = new mongoose.Schema(
 ApplicationSchema.index({ userId: 1, status: 1, createdAt: -1 });
 ApplicationSchema.index({ userId: 1, followUpDate: 1, status: 1 });
 ApplicationSchema.index({ userId: 1, createdAt: -1 });
+// Lookup used when recording a send to decide create-vs-follow-up
+ApplicationSchema.index({ userId: 1, hrEmail: 1 });
 ApplicationSchema.index({ gmailThreadId: 1 }, { sparse: true });
 
 export default mongoose.models.Application || mongoose.model('Application', ApplicationSchema);

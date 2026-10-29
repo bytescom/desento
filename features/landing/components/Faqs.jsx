@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { FiChevronDown } from 'react-icons/fi';
 import { MdHelp, MdSecurity, MdBolt, MdAutoAwesome, MdCheckCircle, MdMenuBook, MdPayment } from 'react-icons/md';
 
@@ -72,6 +73,7 @@ const Faqs = () => {
                             >
                                 <button
                                     onClick={() => toggleFaq(i)}
+                                    aria-expanded={isOpen}
                                     className="w-full text-left px-6 py-5 md:py-6 flex items-start gap-4 focus:outline-none"
                                 >
                                     <div className={`mt-0.5 shrink-0 flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-300 ${isOpen ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -118,12 +120,12 @@ const Faqs = () => {
                                 Can't find what you're looking for? Our support team is here to help.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                <button className="inline-flex items-center justify-center min-h-[44px] px-8 py-3.5 bg-primary text-white hover:bg-primary/90 transition-colors duration-200 font-bold shadow-md shadow-primary/20 text-[15px] rounded-lg cursor-pointer">
+                                <Link
+                                    href="/contact"
+                                    className="inline-flex items-center justify-center min-h-[44px] px-8 py-3.5 bg-primary text-white hover:bg-primary/90 transition-colors duration-200 font-bold shadow-md shadow-primary/20 text-[15px] rounded-lg cursor-pointer"
+                                >
                                     Contact Support
-                                </button>
-                                <button className="inline-flex items-center justify-center min-h-[44px] px-8 py-3.5 bg-white border border-gray-300 text-text rounded-lg hover:bg-gray-50 transition-colors duration-200 font-bold shadow-sm text-[15px] cursor-pointer">
-                                    Browse Help Center
-                                </button>
+                                </Link>
                             </div>
                         </div>
                     </div>

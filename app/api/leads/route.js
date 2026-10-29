@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authOptions, auth } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
+import { isValidEmail } from "@/lib/gmail";
 import HrEmail from "@/models/HrEmail";
 import User from "@/models/User";
 
@@ -53,6 +54,14 @@ export async function POST(request) {
         if (!email || !company || !jobRole) {
             return NextResponse.json(
                 { error: "Email, company, and role are required" },
+                { status: 400 }
+            );
+        }
+
+        // Reject malformed / header-injecting addresses before they reach Gmail
+        if (!isValidEmail(email)) {
+            return NextResponse.json(
+                { error: "Please enter a valid email address" },
                 { status: 400 }
             );
         }

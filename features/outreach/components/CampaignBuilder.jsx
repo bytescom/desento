@@ -83,9 +83,29 @@ const CampaignBuilder = ({ onClose, initialData }) => {
         const newFiles = Array.from(files).map(f => ({
             name: f.name,
             size: `${(f.size / 1024).toFixed(0)} KB`,
+            contentType: f.type || "application/octet-stream",
+            file: f,
         }));
         setAttachments(prev => [...prev, ...newFiles]);
     };
+
+    // Convert kept File objects to base64 for the campaign payload.
+    // Total cap ~4 MB keeps the request under serverless body limits.
+    const attachmentsToPayload = () =>
+        Promise.all(
+            attachments.map(att => {
+                if (!att.file) return { name: att.name, size: att.size, contentType: att.contentType, data: att.data };
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64 = String(reader.result).split(",")[1] || "";
+                        resolve({ name: att.name, size: att.size, contentType: att.contentType, data: base64 });
+                    };
+                    reader.onerror = () => reject(new Error(`Could not read ${att.name}`));
+                    reader.readAsDataURL(att.file);
+                });
+            })
+        );
 
     // ── Save Campaign (Draft or Launch) ───────────────────────────────────
     const saveCampaign = async (status = 'Draft') => {
@@ -93,13 +113,22 @@ const CampaignBuilder = ({ onClose, initialData }) => {
         setSaving(true);
         setError('');
         try {
+            let attachmentPayload = [];
+            if (attachments.length) {
+                attachmentPayload = await attachmentsToPayload();
+                const totalBytes = attachmentPayload.reduce((sum, a) => sum + Math.ceil((a.data || "").length * 0.75), 0);
+                if (totalBytes > 4 * 1024 * 1024) {
+                    setError('Attachments are too large — keep the total under 4 MB.');
+                    return null;
+                }
+            }
             const payload = {
                 name: campaignName,
                 senderEmail,
-                templateId: null,
-                templateSnapshot: selectedTemplate ? { name: selectedTemplate.name, subject: selectedTemplate.subject, body: selectedTemplate.content || '' } : {},
+                templateId: selectedTemplate?._id || null,
+                templateSnapshot: selectedTemplate ? { name: selectedTemplate.name, subject: selectedTemplate.subject, body: selectedTemplate.content || selectedTemplate.body || '' } : {},
                 audienceIds: selectedLeadIds,
-                attachments,
+                attachments: attachmentPayload,
                 trackOpens,
                 trackReplies,
                 stopAfterReply,
@@ -139,11 +168,27 @@ const CampaignBuilder = ({ onClose, initialData }) => {
         setError('');
 
         try {
-            // 2. Call the send endpoint — it sets status to Running then Completed
-            const res = await fetch(`/api/outreach/campaigns/${campaign._id}/send`, { method: 'POST' });
-            const data = await res.json();
-            if (!res.ok) {
-                setError(data.error || 'Failed to send campaign.');
+            // 2. Call the send endpoint repeatedly — large campaigns send in
+            // batches and stay "Running" until every batch is done.
+            let status = 'Running';
+            let lastError = null;
+            for (let attempt = 0; attempt < 40 && status === 'Running'; attempt++) {
+                const res = await fetch(`/api/outreach/campaigns/${campaign._id}/send`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) {
+                    lastError = data.error || 'Failed to send campaign.';
+                    break;
+                }
+                status = data.status;
+            }
+            if (status === 'Running') {
+                // Ran out of retry attempts — the campaign stays resumable
+                setError(lastError || 'Sending is still in progress. You can relaunch this campaign to continue the remaining batch.');
+                onClose();
+                return;
+            }
+            if (lastError) {
+                setError(lastError);
                 return;
             }
             // Success — return to list

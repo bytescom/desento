@@ -110,7 +110,10 @@ export async function GET(request) {
             sentPct:      Math.round((sentCount / total) * 100),
             repliedPct:   Math.round((repliedCount / total) * 100),
             interviewPct: Math.round((interviewCount / total) * 100),
-            total:        totalEmailsSent,
+            // Same source as the chart above (Application statuses) — counting
+            // EmailLogs here desyncs the "total" line from the Sent/Replied bars
+            // for data created before send-logging existed.
+            total:        sentCount,
         };
 
         const stats = { totalLeads, totalSent, followUpsSent, goodReplies };

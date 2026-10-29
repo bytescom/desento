@@ -4,12 +4,46 @@ import { FiX, FiInfo } from 'react-icons/fi';
 import { useScrollLock } from "@/lib/useScrollLock";
 
 
-const TemplateEditorModal = ({ onClose, onSave, initialData }) => {
+const TemplateEditorModal = ({ onClose, onSave, initialData, saveToDb }) => {
     useScrollLock(true);
     const [name, setName] = useState(initialData?.name || '');
     const [subject, setSubject] = useState(initialData?.subject || '');
     const [content, setContent] = useState(initialData?.body || initialData?.content || 'Hi {{name}},\n\n');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
     const textareaRef = useRef(null);
+
+    const handleSave = async () => {
+        if (!name.trim() || !subject.trim() || !content.trim()) {
+            setError('Name, subject, and content are required.');
+            return;
+        }
+        if (!saveToDb) {
+            onSave({ name: name.trim(), subject: subject.trim(), body: content, content });
+            return;
+        }
+        // Persist to DB so the campaign keeps a real templateId and the
+        // template appears in the Templates tab.
+        setSaving(true);
+        setError('');
+        try {
+            const res = await fetch('/api/outreach/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), subject: subject.trim(), body: content }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error || 'Failed to save template.');
+                setSaving(false);
+                return;
+            }
+            onSave(data.template);
+        } catch {
+            setError('Network error. Please try again.');
+            setSaving(false);
+        }
+    };
 
     const insertVariable = (variable) => {
         const start = textareaRef.current.selectionStart;
@@ -59,7 +93,14 @@ const TemplateEditorModal = ({ onClose, onSave, initialData }) => {
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-                    
+
+                    {error && (
+                        <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-lg text-[13px] font-medium text-red-600 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                            {error}
+                        </div>
+                    )}
+
                     <div>
                         <label className="block text-[13px] font-bold text-text-dark mb-1">Template Name</label>
                         <input
@@ -136,11 +177,12 @@ const TemplateEditorModal = ({ onClose, onSave, initialData }) => {
                     >
                         Cancel
                     </button>
-                    <button 
-                        onClick={() => onSave({ name, subject, body: content, content })}
-                        className="px-6 py-2.5 bg-primary text-white text-[14px] font-bold rounded-xl hover:bg-primary/90 transition-colors cursor-pointer shadow-sm"
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2.5 bg-primary text-white text-[14px] font-bold rounded-xl hover:bg-primary/90 transition-colors cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        Save Template
+                        {saving ? 'Saving...' : 'Save Template'}
                     </button>
                 </div>
             </div>

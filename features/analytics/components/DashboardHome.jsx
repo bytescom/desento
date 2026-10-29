@@ -334,7 +334,7 @@ const Dashboard = () => {
       )}
 
       {/* ── Quick Stats ── */}
-      <section aria-label="Quick Stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <section aria-label="Quick Stats" className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {loading
           ? [...Array(4)].map((_, i) => <StatSkeleton key={i} />)
           : quickStats?.map((stat, i) => (
@@ -372,9 +372,6 @@ const Dashboard = () => {
             <p className="text-[14px] text-text font-medium tracking-wide mb-6">
               Set a reminder and tune in live to catch all the latest updates.
             </p>
-            <button className="flex items-center gap-2 px-6 py-3 bg-background rounded-lg text-[13px] font-bold text-text-dark shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border hover:-translate-y-0.5 transition-transform">
-              <FiBell className="text-primary" size={16} /> Set a reminder
-            </button>
           </div>
         </article>
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FiX, FiMail, FiBriefcase, FiUser, FiActivity, FiLayers, FiFileText } from 'react-icons/fi';
 import { closeDrawer, fetchApplicationDetails } from '../../trackingSlice';
@@ -7,12 +7,17 @@ import { closeDrawer, fetchApplicationDetails } from '../../trackingSlice';
 export default function TrackingDrawer() {
     const dispatch = useDispatch();
     const { isDrawerOpen, selectedApplicationId, selectedApplicationDetails, loading } = useSelector(state => state.tracking);
+    const [showEmail, setShowEmail] = useState(false);
 
     useEffect(() => {
         if (isDrawerOpen && selectedApplicationId) {
             dispatch(fetchApplicationDetails(selectedApplicationId));
         }
     }, [isDrawerOpen, selectedApplicationId, dispatch]);
+
+    useEffect(() => {
+        setShowEmail(false);
+    }, [selectedApplicationId]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -70,10 +75,12 @@ export default function TrackingDrawer() {
                             <div className={`w-1.5 h-1.5 rounded-full ${ss.dot}`} />
                             <span className={`text-[11px] font-extrabold tracking-wide ${ss.text}`}>{data.status}</span>
                         </div>
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface border border-border rounded-full">
-                            <span className="text-[11px] font-bold text-muted">Campaign:</span>
-                            <span className="text-[11px] font-bold text-text">{data.campaignName}</span>
-                        </div>
+                        {data.campaignName && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface border border-border rounded-full">
+                                <span className="text-[11px] font-bold text-muted">Campaign:</span>
+                                <span className="text-[11px] font-bold text-text">{data.campaignName}</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -125,14 +132,18 @@ export default function TrackingDrawer() {
                                 <div className="col-span-2 pt-3 border-t border-border/50">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-[12px] font-semibold text-text-dark">Follow-ups Completed</span>
-                                        <span className="text-[12px] font-bold text-primary">{data.followUp.completed} / {data.followUp.total}</span>
+                                        <span className="text-[12px] font-bold text-primary">
+                                            {data.followUp.completed}{data.followUp.total ? ` / ${data.followUp.total}` : ''}
+                                        </span>
                                     </div>
-                                    <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-primary rounded-full transition-all duration-500"
-                                            style={{ width: `${(data.followUp.completed / data.followUp.total) * 100}%` }}
-                                        />
-                                    </div>
+                                    {data.followUp.total ? (
+                                        <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-primary rounded-full transition-all duration-500"
+                                                style={{ width: `${(data.followUp.completed / data.followUp.total) * 100}%` }}
+                                            />
+                                        </div>
+                                    ) : null}
                                     <p className="text-[11px] text-muted font-medium mt-2">Next follow-up: {data.followUp.nextDate}</p>
                                 </div>
                             </div>
@@ -170,6 +181,20 @@ export default function TrackingDrawer() {
                             </div>
                         </div>
 
+                        {/* Sent Email Preview */}
+                        {showEmail && data?.email && (
+                            <div className="bg-background border border-border/60 rounded-xl p-4 shadow-sm">
+                                <h3 className="text-[12px] font-bold text-muted tracking-wider uppercase mb-3 flex items-center gap-2">
+                                    <FiMail size={13} /> Sent Email
+                                </h3>
+                                <p className="text-[13px] font-bold text-text-dark mb-1">{data.email.subject}</p>
+                                <p className="text-[11px] text-muted font-medium mb-3">Sent {data.email.sentAt || '—'}</p>
+                                <div className="text-[13px] text-text font-medium leading-relaxed whitespace-pre-wrap bg-surface/50 p-3 rounded-lg border border-border/40 max-h-64 overflow-y-auto">
+                                    {data.email.body}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Notes Section Placeholder */}
                         <div className="bg-background border border-border/60 rounded-xl p-4 shadow-sm mb-4">
                             <h3 className="text-[12px] font-bold text-muted tracking-wider uppercase mb-3 flex items-center gap-2">
@@ -190,11 +215,12 @@ export default function TrackingDrawer() {
 
             {/* Quick Actions Footer */}
             <div className="p-4 border-t border-border/50 bg-background shrink-0 flex gap-2">
-                <button className="flex-1 py-2.5 bg-surface border border-border rounded-xl text-[13px] font-bold text-text hover:bg-border/50 transition-colors">
-                    Edit Application
-                </button>
-                <button className="flex-1 py-2.5 bg-primary text-white rounded-xl text-[13px] font-bold hover:bg-primary/90 shadow-sm transition-colors">
-                    View Email
+                <button
+                    onClick={() => setShowEmail(prev => !prev)}
+                    disabled={!data?.email}
+                    className="flex-1 py-2.5 bg-primary text-white rounded-xl text-[13px] font-bold hover:bg-primary/90 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {showEmail ? 'Hide Email' : 'View Email'}
                 </button>
             </div>
 

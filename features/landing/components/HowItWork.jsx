@@ -72,7 +72,7 @@ const HowItWorks = () => {
                                 </div>
 
                                 {/* Card body */}
-                                <div className="bg-white rounded-xl border border-border/60 p-6 text-center shadow-[0_4px_24px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgb(0,0,0,0.06)] transition-all duration-300 w-full h-full group-hover:border-primary/15">
+                                <div className="bg-white rounded-xl border border-border/60 p-6 text-center shadow-[0_4px_24px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_32px_rgb(0,0,0,0.06)] transition-all duration-300 w-full h-full group-hover:border-primary/15 flex flex-col justify-center">
                                     <h3 className="text-xl font-bold text-text-dark mb-3 tracking-tight">{item.title}</h3>
                                     <p className="text-text/65 font-medium leading-relaxed text-[15px]">
                                         {item.desc}
