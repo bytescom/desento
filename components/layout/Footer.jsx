@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { FiTwitter, FiGithub, } from "react-icons/fi";
 
 export default function Footer() {
@@ -44,7 +45,7 @@ export default function Footer() {
                     {/* Brand Section */}
                     <div className="lg:col-span-4 space-y-6">
                         <Link href="/" className="flex items-center gap-2" aria-label="Desento">
-                            <img src="/icon.svg" alt="Desento Logo" className="w-6 h-6" />
+                            <Image src="/icon.svg" alt="Desento Logo" width={24} height={24} className="w-6 h-6" />
                             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-primary">
                                 Desento<span className="text-secondary">.</span>
                             </h1>

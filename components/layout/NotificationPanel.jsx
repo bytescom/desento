@@ -64,14 +64,28 @@ export default function NotificationPanel() {
         }
     };
 
-    // Load on mount (so the unread badge is accurate) and on every open
+    // Load on mount (so the unread badge is accurate)
     useEffect(() => {
-        if (mounted) loadNotifications();
-    }, [mounted]);
+        let ignore = false;
+        fetch("/api/notifications")
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (data && !ignore) {
+                    setNotifications(data.notifications || []);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
-    useEffect(() => {
-        if (open) loadNotifications();
-    }, [open]);
+    const handleToggle = () => {
+        if (!open) {
+            loadNotifications();
+        }
+        setOpen((prev) => !prev);
+    };
 
     // Recalculate panel position whenever open state changes
     useEffect(() => {
@@ -269,7 +283,7 @@ export default function NotificationPanel() {
             {/* Bell button */}
             <button
                 ref={bellRef}
-                onClick={() => setOpen((prev) => !prev)}
+                onClick={handleToggle}
                 className={`relative flex items-center justify-center w-9 h-9 rounded-xl border transition-all duration-200 cursor-pointer
                     ${open
                         ? "bg-primary border-primary text-white shadow-md shadow-primary/20"

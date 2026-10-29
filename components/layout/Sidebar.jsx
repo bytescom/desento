@@ -146,7 +146,7 @@ export default function Sidebar() {
             {/* Mobile Topbar */}
             <div className="md:hidden flex items-center justify-between p-4 bg-background/90 backdrop-blur-xl border border-border/50 rounded-xl shrink-0 w-full shadow-sm relative z-30">
                 <Link href="/" className="flex items-center gap-3 group" aria-label="Desento">
-                    <img src="/icon.svg" alt="Desento Logo" className="w-7 h-7" />
+                    <Image src="/icon.svg" alt="Desento Logo" width={28} height={28} className="w-7 h-7" />
                     <h1 className="text-xl font-black tracking-tighter text-primary transition-colors">
                         Desento<span className="text-secondary">.</span>
                     </h1>
@@ -178,7 +178,7 @@ export default function Sidebar() {
                     <div className={`p-5 rounded-t-lg border-b border-text/20 flex items-center ${isOpen || mobileOpen ? "justify-between" : "justify-center"}`}>
                         {(isOpen || mobileOpen) && (
                             <Link href="/" className="flex items-center gap-3 group" aria-label="Desento">
-                                <img src="/icon.svg" alt="Desento Logo" className="w-7 h-7" />
+                                <Image src="/icon.svg" alt="Desento Logo" width={28} height={28} className="w-7 h-7" />
                                 <h1 className="text-xl font-black tracking-tighter text-primary transition-colors">
                                     Desento<span className="text-secondary">.</span>
                                 </h1>

@@ -31,24 +31,6 @@ html {
   animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Version Upgrade Modal Animations */
-@keyframes upgradeFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes upgradeFadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-@keyframes upgradeCardIn {
-  from { opacity: 0; transform: scale(0.92) translateY(24px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-@keyframes upgradeCardOut {
-  from { opacity: 1; transform: scale(1) translateY(0); }
-  to { opacity: 0; transform: scale(0.95) translateY(12px); }
-}
-
 /* Scrollbars — neutral overlay style (industry standard): transparent track,
    subtle slate thumb that darkens on hover. Never brand-colored. */
 * {

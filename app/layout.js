@@ -1,10 +1,8 @@
 import { Manrope } from "next/font/google";
 import AuthProvider from "@/lib/AuthProvider";
 import ReduxProvider from "@/components/providers/ReduxProvider";
-import VersionUpgradeModal from "@/components/VersionUpgradeModal";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
-
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -27,7 +25,6 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
         <AuthProvider>
           <ReduxProvider>
-            <VersionUpgradeModal />
             {children}
             <Toaster
               position="top-right"
